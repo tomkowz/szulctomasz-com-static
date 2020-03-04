@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2018/09/add-fireworks-and-sparks-to-a-uiview/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2016/07/how-do-i-build-a-network-layer/</loc>
+    <lastmod>2016-07-30T19:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2016/05/custom-view-controller-transition-by-expanding-view/</loc>
+    <lastmod>2016-05-14T19:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2015/08/initialization-process-of-a-view-loaded-from-a-storyboard/</loc>
+    <lastmod>2015-08-21T19:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2015/08/i-wrote-a-copy-of-2048-game-in-10-hours-and-submitted-to-the-app-store/</loc>
+    <lastmod>2015-08-04T19:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/2015/08/uiviewcontrollers-view-loading-process-demystified/</loc>
+    <lastmod>2015-08-03T19:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/1/01/blog-archive/</loc>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/programming-blog/1/01/blog-archive-2017/</loc>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/categories/</loc>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/ios/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/network/</loc>
+    <lastmod>2016-07-30T19:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/programming/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/swift/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/talks/</loc>
+  </url>
+  
+  <url>
+    <loc>http://szulctomasz.com/tags/ui/</loc>
+    <lastmod>2018-09-20T08:00:00+00:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+</urlset>

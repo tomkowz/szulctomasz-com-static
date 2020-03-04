@@ -1,0 +1,227 @@
+body {
+    background-color: #ffffff;
+    font-family: "Karla", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 20px;
+    line-height: 1.5em;
+    color: #464646;
+}
+
+::selection {
+    background: #F6DE61;
+}
+
+::-moz-selection {
+    background: #F6DE61;
+}
+
+h3 {
+    font-size: 1.0em;
+    font-weight: normal;
+    margin: 0 0 1em 0;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.margin-bottom-0 {
+    margin-bottom: 0 !important; 
+}
+
+p {
+    margin-top: 2px;
+}
+
+a:link {
+    color: #FF6904;
+    font-size: 1.0em;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+a.post-title {
+    font-size: 1em;
+}
+
+a:visited {
+    color: #CF3475;
+}
+
+#main-container {
+    margin: 15px auto;
+}
+
+#top-header {
+    margin-bottom: 10px;
+}
+
+#top-header #avatar {
+    width: 50px;
+    height: 50px;
+}
+
+#top-header ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 12px 0px 0px 25px;
+    display: inline-block;
+    position: absolute;
+}
+
+#top-header ul li {
+    display: inline-block;
+    margin-right: 1em;
+}
+
+#top-header a:visited {
+    color: #FF6904;
+}
+
+footer {
+    font-size: 0.8em;
+}
+
+footer p {
+    margin: 0;
+    padding: 0;
+}
+
+button {
+    font-size: 0.9em;
+    margin: 0 0.5em 0 0;
+    padding: 0.4em 0.6em 0.4em 0.6em;
+    border: 1px solid #000000;
+    display: inline-block;
+    -moz-border-radius: 6px;
+    -webkit-border-radius: 6px;
+    -khtml-border-radius: 6px;
+    border-radius: 6px;
+    background-color: #FFFFFF;
+}
+
+button:focus {
+    outline: 0;
+}
+
+ul {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+ul li {
+    margin: 0;
+    padding: 0;
+}
+
+/*
+Decorators
+*/
+.u {
+    text-decoration: underline;
+}
+
+.b {
+    font-weight: 800;
+}
+
+.width-default {
+    max-width: 640px;
+}
+
+/*
+/programming-blog/entry
+*/
+.blog-entry, .blog-archive-entry {
+    font-size: 1em;
+}
+
+.blog-entry .title, .blog-archive-entry .title {
+    font-size: 1.0em;
+    font-weight: normal;
+    margin: 0;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.blog-entry .date {
+    font-size: 0.65em;
+    display: inline-block;
+    color: #888888;
+}
+
+/*
+/programming-blog/archive/entry
+*/
+.blog-archive-entry {
+    margin: -0.2em 0 0 0;
+}
+
+/*
+/programming-blog/archive-2017
+*/
+.blog-archive-2017 li {
+    margin: 0 0 1em 0;
+}
+
+/*
+/programming-blog/article
+*/
+article ul {
+    list-style-type: disc;
+    margin: 0 0 1em 1em;
+}
+
+article ul li {
+    margin: 0 0 0.5em 0;
+}
+
+article h2, article h3, article h4 {
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin: 2em 0 0.5em 0;
+}
+
+article h2:before, article h3:before, article h4:before {
+    content: "_";
+}
+
+article h2:after, article h3:after, article h4:after {
+    content: "_";
+}
+
+article pre {
+    font-size: 0.65em;
+    line-height: 1.3em;
+    background: #FFFFFF;
+    padding: 0 0 0 1em;
+
+    white-space: pre-wrap;
+    white-space: -moz-pre-wrap;
+    white-space: -pre-wrap;
+    white-space: -o-pre-wrap;
+    word-wrap: break-word;
+}
+
+article img {
+    max-width: 100%;
+    display: block;
+    margin: 0 auto;
+}
+
+article footer {
+    font-size: 1em;
+}
+
+/*
+Additions 
+*/
+a.intive {
+    color: #597BC5;
+}
+
+a.intive:visited {
+    color: #597BC5;
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tomasz Szulc</title>
+    <link>http://szulctomasz.com/tags/network/</link>
+    <description>Recent content in Network on Tomasz Szulc</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 30 Jul 2016 19:00:00 +0000</lastBuildDate>
+    
+        <atom:link href="http://szulctomasz.com/tags/network/index.xml" rel="self" type="application/rss+xml" />
+    
+  </channel>
+</rss>

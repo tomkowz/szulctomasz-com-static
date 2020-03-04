@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+	<title>UIViewController&#39;s view loading process demystified - Tomasz Szulc</title>
+
+	
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="iOS Software Engineer. Personal site, programming blog and more." />
+<meta name="author" content="Tomasz Szulc" />
+<meta name="keywords" content="developer, ios, programming, mobile, apps" />
+
+	
+    
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="UIViewController&#39;s view loading process demystified" />
+    <meta property="og:description" content="@NatashaTheRobot posted about testing view controllers and issues with loading views on her blog in &#34;The One Weird Trick For Testing View Controllers in Swift&#34; post." />
+
+    
+
+    <meta property="article:published_time" content="2015-08-03 19:00:00 &#43;0000 UTC" />
+    <meta property="article:tag" content="programming, ios, swift" />
+    
+    
+
+
+
+	
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Karla" />
+<link rel="stylesheet" href="/css/style.css" />
+
+	
+<link rel="shortcut icon" type="image/jpg" href="/img/favicon.jpg"/ />
+<link rel="shortcut icon" type="image/x-icon" href="/img/favicon.ico"/ />
+<link rel ="icon" type="image/jpg" href="/img/favicon.jpg"/ />
+
+	<meta name="generator" content="Hugo 0.37.1" />
+
+	<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-4112786-17', 'auto');
+    ga('send', 'pageview');
+</script>
+</head>
+<body>
+	<main id="main-container" class= "width-default">
+
+<div id="top-header">
+    <img id="avatar" src="/img/rounded-avatar.png">
+    <ul>
+        <li><a href="/programming-blog">blog</a></li>
+        <li><a href="/">about</a></li>
+        
+    </ul>
+</div>
+    <article>
+        <h1>UIViewController&#39;s view loading process demystified</h1>
+        <p>
+
+<p><a href="http://twitter.com/NatashaTheRobot">@NatashaTheRobot</a> posted about testing view controllers and
+issues with loading views on her blog in
+<a href="http://natashatherobot.com/ios-testing-view-controllers-swift/">The One Weird Trick For Testing View Controllers in Swift</a> post.</p>
+
+<p>She also wrote:</p>
+
+<blockquote>
+<p>The key here is that Apple overrides the viewController’s view getter to call the loadView function and do a bunch of other things we have no access to. If anyone else has other great insights into why this works, feel free to add it in the comments!</p>
+</blockquote>
+
+<p>Yeah.. this is interesting what is going on under the hood. She inspired me
+and I started digging and debugging a bit. I&rsquo;ve noticed there are two flows -
+one when view controller is assigned to window as root view controller and one
+when it is not (e.g. when you want to test view controller and you
+  instantiated it from storyboard).</p>
+
+<h3 id="view-controller-as-a-rootviewcontroller">View Controller as a rootViewController</h3>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="k">if</span> <span class="kc">self</span><span class="p">.</span><span class="n">window</span> <span class="p">==</span> <span class="kc">nil</span> <span class="p">{</span>
+    <span class="kc">self</span><span class="p">.</span><span class="n">window</span> <span class="p">=</span> <span class="n">UIWindow</span><span class="p">(</span><span class="n">frame</span><span class="p">:</span> <span class="n">UIScreen</span><span class="p">.</span><span class="n">mainScreen</span><span class="p">().</span><span class="n">bounds</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">let</span> <span class="nv">storyboard</span> <span class="p">=</span> <span class="n">UIStoryboard</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="s">&#34;Main&#34;</span><span class="p">,</span> <span class="n">bundle</span><span class="p">:</span> <span class="n">NSBundle</span><span class="p">.</span><span class="n">mainBundle</span><span class="p">())</span>
+<span class="kd">let</span> <span class="nv">vc</span> <span class="p">=</span> <span class="n">storyboard</span><span class="p">.</span><span class="n">instantiateViewControllerWithIdentifier</span><span class="p">(</span><span class="s">&#34;ViewController&#34;</span><span class="p">)</span>
+<span class="kc">self</span><span class="p">.</span><span class="n">window</span><span class="o">!</span><span class="p">.</span><span class="n">rootViewController</span> <span class="p">=</span> <span class="n">vc</span></code></pre></div>
+
+<p>This is the flow which takes a place e.g. in
+<code>application:DidFinishLaunchingWithOptions:</code> method.</p>
+
+<p><img src="/uploads/programming-blog/post-26/1.png" alt="image-1" /></p>
+
+<p>The flow starts by calling <code>makeKeyAndVisible</code> method of <code>UIWindow</code> which calls
+its private <code>addRootViewControllerViewIfPossible</code> method that tries to add view
+of root view controller to itself and presents it. <code>UIWindow</code> accesses <code>view</code> property
+of the root view controller which starts a chain of loading view process.
+The accessor calls <code>loadViewIfRequired</code> method which calls <code>loadView</code> method.
+The <code>loadView</code> calls internal methods of <code>UIViewController</code> that loads nib with
+a view that will be set.</p>
+
+<p>There is one great talk from this year&rsquo;s WWDC which covered how Storyboard and
+their nibs behaves at runtime - <a href="https://developer.apple.com/videos/wwdc/2015/?id=407">Implementing UI Design in Interface Builder</a>.</p>
+
+<p>After the loaded view is set, view controller calls its internal <code>_window</code> method
+and read all the things like <code>preferedInterfaceOrientation</code>,
+<code>supportedInterfaceOrientations</code>, <code>shouldAutorotate</code>, etc. Actually it calls
+<code>_window</code> many times and there are some other methods called too.</p>
+
+<p>Next <code>viewDidLoad</code> method is called and private <code>__viewWillAppear</code> which calls
+<code>viewWillAppear</code> on view controller. View is about to be presented so there are
+calls to <code>willMoveToWindow:</code>, <code>willMoveToSuperview:</code> and private
+<code>_didMoveFromWindow:toWindow:</code> methods.</p>
+
+<p>The next thing is setting up Auto Layout in the view, so <code>layoutMarginsDidChange</code>,
+<code>didMoveToWindow</code>, <code>didMoveToSuperview</code>, <code>updateViewConstraints</code>,
+<code>updateConstraints</code>, <code>layoutSublayersOfLayer</code>, <code>viewWillLayoutSubviews</code>, <code>layoutSubviews</code>
+methods are called - there is a lot of them.</p>
+
+<p>Finally <code>viewDidAppear:</code> is called and view is presented.</p>
+
+<h3 id="view-controller-loaded-in-testing">View Controller loaded in testing</h3>
+
+<p>This is another important case worth to investigate. In this case you probably
+don&rsquo;t want to create window and put your view controller under the test to it.
+You just want to instantiate view controller instance from storyboard and test it.</p>
+
+<p>Before Natasha&rsquo;s post I known just one method to load view of a view controller
+and make sure it is loaded. I did it by accessing view property directly after
+view controller was created. Today I&rsquo;ve learned about <code>loadViewIfNeeded</code> method
+which is available since iOS 9 and behaves the same way like accessing <code>view</code>
+property. I&rsquo;ve also learned third - IMO the best method to load the view controller
+during testing and make sure it is ready to use - presented by <a href="twitter.com/orta">Ørta</a>.
+This is about calling <code>beginAppearanceTransition:animated</code> and
+<code>endApperanceTransition</code> methods. <a href="https://github.com/artsy/eigen/blob/master/Artsy_Tests/Extensions/UIViewController+PresentWithFrame.m#L20-L22">Here is solution he shared</a> - covered
+below.</p>
+
+<h3 id="accessing-view-directly">Accessing view directly</h3>
+
+<p>Let&rsquo;s take a look on a flow when accessing view directly.
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">let</span> <span class="nv">storyboard</span> <span class="p">=</span> <span class="n">UIStoryboard</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="s">&#34;Main&#34;</span><span class="p">,</span> <span class="n">bundle</span><span class="p">:</span> <span class="n">NSBundle</span><span class="p">.</span><span class="n">mainBundle</span><span class="p">())</span>
+<span class="kd">let</span> <span class="nv">vc</span> <span class="p">=</span> <span class="n">storyboard</span><span class="p">.</span><span class="n">instantiateViewControllerWithIdentifier</span><span class="p">(</span><span class="s">&#34;ViewController&#34;</span><span class="p">)</span>
+<span class="kc">_</span> <span class="p">=</span> <span class="n">vc</span><span class="p">.</span><span class="n">view</span></code></pre></div></p>
+
+<p>And the flow is like below:</p>
+
+<p><img src="/uploads/programming-blog/post-26/2.png" alt="image-2" /></p>
+
+<p>Okaaay&hellip; There is much less calls. View has been accessed and loaded.
+The window is nil so I think no more methods have been called and the flow
+ended up in <code>viewDidLoad</code>. A bit strange. Some configuration might be inside
+<code>viewWillAppear</code> or <code>viewDidLoad</code>. This method should work in most test cases.
+<code>loadViewIfNeeded</code> works the same way.</p>
+
+<p>Let&rsquo;s check how <code>beginApperanceTransition:animated:</code> behaves.</p>
+
+<h3 id="beginapperancetransition-animated">beginApperanceTransition:animated</h3>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">let</span> <span class="nv">storyboard</span> <span class="p">=</span> <span class="n">UIStoryboard</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="s">&#34;Main&#34;</span><span class="p">,</span> <span class="n">bundle</span><span class="p">:</span> <span class="n">NSBundle</span><span class="p">.</span><span class="n">mainBundle</span><span class="p">())</span>
+<span class="kd">let</span> <span class="nv">vc</span> <span class="p">=</span> <span class="n">storyboard</span><span class="p">.</span><span class="n">instantiateViewControllerWithIdentifier</span><span class="p">(</span><span class="s">&#34;ViewController&#34;</span><span class="p">)</span>
+<span class="n">vc</span><span class="p">.</span><span class="n">beginAppearanceTransition</span><span class="p">(</span><span class="kc">true</span><span class="p">,</span> <span class="n">animated</span><span class="p">:</span> <span class="kc">false</span><span class="p">)</span>
+<span class="n">vc</span><span class="p">.</span><span class="n">endAppearanceTransition</span><span class="p">()</span></code></pre></div>
+
+<p><img src="/uploads/programming-blog/post-26/3.png" alt="image-3" /></p>
+
+<p>Great! This flow is more similar to the first one. You can see there is no window
+here so the view of view controller is not added to the flow so no auto layout
+configuration code is running. Just view controller configuration.</p>
+
+<h3 id="conclusion">Conclusion</h3>
+
+<p>You can see the loading view flow depends of in which context view controller
+and view are used.</p>
+
+<p>In the first case there was a view and view controller was the root one so it
+has a lot of configuration and view was configured too.</p>
+
+<p>In the last case there is just view controller configuration since there is no
+window and configuring view is not necessary. This approach also simulated
+presenting view controller so <code>viewWillAppear</code> and <code>viewDidAppear</code> method have
+been called - This might be important in some cases.</p>
+
+<p>And the last case I would mention is the second one. I didn&rsquo;t know earlier
+that it behaves like this. I would expect that viewWill/viewDid method are
+called too, but they didn&rsquo;t. IMO the approach presented by <a href="twitter.com/orta">Ørta</a>
+is the best one when testing view controllers.</p>
+</p>
+        <footer>--<br/>2015-2018 All rights reserved. Tomasz Szulc</footer>
+    </article>
+        <footer></footer>
+    </main>
+</body>
+</html>

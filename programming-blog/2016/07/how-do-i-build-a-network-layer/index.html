@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+	<title>How do I build a Network Layer - Tomasz Szulc</title>
+
+	
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="iOS Software Engineer. Personal site, programming blog and more." />
+<meta name="author" content="Tomasz Szulc" />
+<meta name="keywords" content="developer, ios, programming, mobile, apps" />
+
+	
+    
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="How do I build a Network Layer" />
+    <meta property="og:description" content="Let&#39;s design and build a reusable network layer." />
+
+    
+
+    <meta property="article:published_time" content="2016-07-30 19:00:00 &#43;0000 UTC" />
+    <meta property="article:tag" content="programming, ios, swift, network" />
+    
+    
+
+
+
+	
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Karla" />
+<link rel="stylesheet" href="/css/style.css" />
+
+	
+<link rel="shortcut icon" type="image/jpg" href="/img/favicon.jpg"/ />
+<link rel="shortcut icon" type="image/x-icon" href="/img/favicon.ico"/ />
+<link rel ="icon" type="image/jpg" href="/img/favicon.jpg"/ />
+
+	<meta name="generator" content="Hugo 0.37.1" />
+
+	<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-4112786-17', 'auto');
+    ga('send', 'pageview');
+</script>
+</head>
+<body>
+	<main id="main-container" class= "width-default">
+
+<div id="top-header">
+    <img id="avatar" src="/img/rounded-avatar.png">
+    <ul>
+        <li><a href="/programming-blog">blog</a></li>
+        <li><a href="/">about</a></li>
+        
+    </ul>
+</div>
+    <article>
+        <h1>How do I build a Network Layer</h1>
+        <p>
+
+<p>Working and leading two projects at a time means a great opportunity to
+experiment with app architecture, and do experiments with other concepts I
+had in mind or just learned and wanted to try them out. One of topics I learned
+recently and I think you might find it useful if how I build a network layer now.</p>
+
+<p>Nowadays mobile apps are client-server oriented, so pretty much there is a network layer
+somewhere in the app, smaller or bigger. I saw many implementations to date but every
+had some drawbacks. Not thinking the latest one I build has no drawbacks, but it seems to
+work very well in two projects I am working on currently. <em>And has test coverage close to 100%</em>.</p>
+
+<p>In this article we&rsquo;ll cover network layer that talks only with one backend,
+sending JSON encoded requests, so not that complex. The layer will talk with AWS
+later on and send some files there, but it should be easy to extend its functionality
+to do so.</p>
+
+<h2 id="thinking-process">Thinking process</h2>
+
+<p>Here are some questions I like to ask myself before building such a layer.</p>
+
+<ul>
+<li>Where to put the code that have knowledge about the backend url?</li>
+<li>Where to put the code that knows about the endpoints?</li>
+<li>Where to put the code that knows how to build a request?</li>
+<li>Where to keep all the code that cares about preparing parameters for a request?</li>
+<li>Where should I store authentication token?</li>
+<li>How to execute requests?</li>
+<li>When and where to execute requests?</li>
+<li>Do I care about cancelling requests?</li>
+<li>Do I need to care about wrong backend responses? Some backend bugs?</li>
+<li>Do I need to use 3rd party frameworks? What frameworks should I use?</li>
+<li>Is there any core data stuff passing around?</li>
+<li>How to test the solution?</li>
+</ul>
+
+<h2 id="storing-backend-url">Storing backend url</h2>
+
+<p>First of all, <em>where should I put the backend url?</em> How other piece of the system
+will know where to send requests? I prefer to create a <code>BackendConfiguration</code> class
+that stores such information.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">import</span> <span class="nc">Foundation</span>
+
+<span class="kd">public</span> <span class="kr">final</span> <span class="kd">class</span> <span class="nc">BackendConfiguration</span> <span class="p">{</span>
+
+    <span class="kd">let</span> <span class="nv">baseURL</span><span class="p">:</span> <span class="n">NSURL</span>
+
+    <span class="kd">public</span> <span class="kd">init</span><span class="p">(</span><span class="n">baseURL</span><span class="p">:</span> <span class="n">NSURL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">baseURL</span> <span class="p">=</span> <span class="n">baseURL</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kd">var</span> <span class="nv">shared</span><span class="p">:</span> <span class="n">BackendConfiguration</span><span class="o">!</span>
+<span class="p">}</span></code></pre></div>
+
+<p>Easy to test, easy to configure. You can set the <code>shared</code> static variable and
+access it wherever you want in your network layer, no need to pass it everywhere.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">let</span> <span class="nv">backendURL</span> <span class="p">=</span> <span class="n">NSURL</span><span class="p">(</span><span class="n">string</span><span class="p">:</span> <span class="s">&#34;https://szulctomasz.com&#34;</span><span class="p">)</span><span class="o">!</span>
+<span class="n">BackendConfiguration</span><span class="p">.</span><span class="n">shared</span> <span class="p">=</span> <span class="n">BackendConfiguration</span><span class="p">(</span><span class="n">baseURL</span><span class="p">:</span> <span class="n">backendURL</span><span class="p">)</span></code></pre></div>
+
+<h2 id="endpoints">Endpoints</h2>
+
+<p>That&rsquo;s the topic I experimented with for a while before I found a ready-to-go
+solution. Tried hardcoding endpoints while configuring <code>NSURLSession</code>, tried
+some dummy <code>Resource</code>-like objects that knows about the endpoint and can be easily
+instantiated and injected, but it was still not what I was looking for.</p>
+
+<p>I came up with idea to create <code>*Request</code> object that knows which endpoint to hit,
+what method to use, should it be GET, POST, PUT or different, how to configure
+the body of a request and what headers to pass.</p>
+
+<p>This is what I came up with</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">protocol</span> <span class="nc">BackendAPIRequest</span> <span class="p">{</span>
+    <span class="kd">var</span> <span class="nv">endpoint</span><span class="p">:</span> <span class="nb">String</span> <span class="p">{</span> <span class="kr">get</span> <span class="p">}</span>
+    <span class="kd">var</span> <span class="nv">method</span><span class="p">:</span> <span class="n">NetworkService</span><span class="p">.</span><span class="n">Method</span> <span class="p">{</span> <span class="kr">get</span> <span class="p">}</span>
+    <span class="kd">var</span> <span class="nv">parameters</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">]?</span> <span class="p">{</span> <span class="kr">get</span> <span class="p">}</span>
+    <span class="kd">var</span> <span class="nv">headers</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">String</span><span class="p">]?</span> <span class="p">{</span> <span class="kr">get</span> <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>A class that implements the protocol is able to provide a basic informations
+that are required to build a request. The <code>NetworkService.Method</code> is just an enum
+with <code>GET</code>, <code>POST</code>, <code>PUT</code>, <code>DELETE</code> cases.</p>
+
+<p>An example request that maps an endpoint might look like this
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kr">final</span> <span class="kd">class</span> <span class="nc">SignUpRequest</span><span class="p">:</span> <span class="n">BackendAPIRequest</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">firstName</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">lastName</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">email</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">password</span><span class="p">:</span> <span class="nb">String</span>
+
+    <span class="kd">init</span><span class="p">(</span><span class="n">firstName</span><span class="p">:</span> <span class="nb">String</span><span class="p">,</span> <span class="n">lastName</span><span class="p">:</span> <span class="nb">String</span><span class="p">,</span> <span class="n">email</span><span class="p">:</span> <span class="nb">String</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">String</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">firstName</span> <span class="p">=</span> <span class="n">firstName</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">lastName</span> <span class="p">=</span> <span class="n">lastName</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">email</span> <span class="p">=</span> <span class="n">email</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">password</span> <span class="p">=</span> <span class="n">password</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nv">endpoint</span><span class="p">:</span> <span class="nb">String</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="s">&#34;/users&#34;</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nv">method</span><span class="p">:</span> <span class="n">NetworkService</span><span class="p">.</span><span class="n">Method</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="p">.</span><span class="n">POST</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nv">parameters</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">]?</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="s">&#34;first_name&#34;</span><span class="p">:</span> <span class="n">firstName</span><span class="p">,</span>
+            <span class="s">&#34;last_name&#34;</span><span class="p">:</span> <span class="n">lastName</span><span class="p">,</span>
+            <span class="s">&#34;email&#34;</span><span class="p">:</span> <span class="n">email</span><span class="p">,</span>
+            <span class="s">&#34;password&#34;</span><span class="p">:</span> <span class="n">password</span>
+        <span class="p">]</span>
+    <span class="p">}</span>
+
+    <span class="kd">var</span> <span class="nv">headers</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">String</span><span class="p">]?</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s">&#34;Content-Type&#34;</span><span class="p">:</span> <span class="s">&#34;application/json&#34;</span><span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div></p>
+
+<p>To not create the dictionary for headers everywhere we can define extension for
+<code>BackendAPIRequest</code>.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">extension</span> <span class="nc">BackendAPIRequest</span> <span class="p">{</span>
+
+    <span class="kd">func</span> <span class="nf">defaultJSONHeaders</span><span class="p">()</span> <span class="p">-&gt;</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">String</span><span class="p">]</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="p">[</span><span class="s">&#34;Content-Type&#34;</span><span class="p">:</span> <span class="s">&#34;application/json&#34;</span><span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>The <code>*Request</code> class takes all the parameters needed to make a successful request.
+You&rsquo;re always sure that at least all the parameters you need will be passed, otherwise you can&rsquo;t
+create a request object.</p>
+
+<p>Defining endpoint is easy. If there should be some id of an object that should be
+included in the endpoint it is super easy to add it because you actually would
+have such id stored as a property.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">private</span> <span class="kd">let</span> <span class="nv">id</span><span class="p">:</span> <span class="nb">String</span>
+
+<span class="kd">init</span><span class="p">(</span><span class="n">id</span><span class="p">:</span> <span class="nb">String</span><span class="p">,</span> <span class="p">...)</span> <span class="p">{</span>
+  <span class="kc">self</span><span class="p">.</span><span class="n">id</span> <span class="p">=</span> <span class="n">id</span>
+<span class="p">}</span>
+
+<span class="kd">var</span> <span class="nv">endpoint</span><span class="p">:</span> <span class="nb">String</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="s">&#34;/users/</span><span class="si">\(</span><span class="n">id</span><span class="si">)</span><span class="s">&#34;</span>
+<span class="p">}</span></code></pre></div>
+
+<p>The method of the request never changes, the parameters body is easily constructed
+and very easy to maintain, headers too. Everything is very easy to test.</p>
+
+<h2 id="executing-the-request">Executing the request</h2>
+
+<p><em>Do I need any 3rd party frameworks to communicate with the backend?</em></p>
+
+<p>I see that people are using AFNetworking (Objective-C) and Alamofire for Swift.
+I used it many times, but for some time I am not using it. Since we&rsquo;ve got <code>NSURLSession</code>
+that do its job very well I don&rsquo;t think you need any 3rd party framework.
+IMO this dependency is going to make your app architecture more complex.</p>
+
+<p>The current solution consists of two classes - <code>NetworkService</code> and <code>BackendService</code>.</p>
+
+<ul>
+<li><p><code>NetworkService</code> - allows you to execute HTTP request, it incorporates <code>NSURLSession</code> internally.
+Every network service can execute just one request at a time, can cancel the request (big advantage),
+and has callbacks for success and failure responses.</p></li>
+
+<li><p><code>BackendService</code> - (Not the coolest name ever but fits quite well) is the class that takes
+requests (<code>*Request</code> objects described above) related to the backend.
+It uses <code>NetworkService</code> internally. In the current version I am using,
+it tries to serialize the response data to json using <code>NSJSONSerializer</code>.</p></li>
+</ul>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">class</span> <span class="nc">NetworkService</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">task</span><span class="p">:</span> <span class="n">NSURLSessionDataTask</span><span class="p">?</span>
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">successCodes</span><span class="p">:</span> <span class="nb">Range</span><span class="p">&lt;</span><span class="nb">Int</span><span class="o">&gt;</span> <span class="p">=</span> <span class="mf">200.</span><span class="p">.&lt;</span><span class="mi">299</span>
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">failureCodes</span><span class="p">:</span> <span class="nb">Range</span><span class="p">&lt;</span><span class="nb">Int</span><span class="o">&gt;</span> <span class="p">=</span> <span class="mf">400.</span><span class="p">.&lt;</span><span class="mi">499</span>
+
+    <span class="kd">enum</span> <span class="nc">Method</span><span class="p">:</span> <span class="nb">String</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="n">GET</span><span class="p">,</span> <span class="n">POST</span><span class="p">,</span> <span class="n">PUT</span><span class="p">,</span> <span class="n">DELETE</span>
+    <span class="p">}</span>
+
+    <span class="kd">func</span> <span class="nf">request</span><span class="p">(</span><span class="n">url</span> <span class="n">url</span><span class="p">:</span> <span class="n">NSURL</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">Method</span><span class="p">,</span>
+                 <span class="n">params</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">]?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">,</span>
+                 <span class="n">headers</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">String</span><span class="p">]?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">,</span>
+                 <span class="n">success</span><span class="p">:</span> <span class="p">(</span><span class="n">NSData</span><span class="p">?</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">,</span>
+                 <span class="n">failure</span><span class="p">:</span> <span class="p">((</span><span class="n">data</span><span class="p">:</span> <span class="n">NSData</span><span class="p">?,</span> <span class="n">error</span><span class="p">:</span> <span class="n">NSError</span><span class="p">?,</span> <span class="n">responseCode</span><span class="p">:</span> <span class="nb">Int</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="kd">let</span> <span class="nv">mutableRequest</span> <span class="p">=</span> <span class="n">NSMutableURLRequest</span><span class="p">(</span><span class="n">URL</span><span class="p">:</span> <span class="n">url</span><span class="p">,</span> <span class="n">cachePolicy</span><span class="p">:</span> <span class="p">.</span><span class="n">ReloadIgnoringLocalAndRemoteCacheData</span><span class="p">,</span>
+                                                 <span class="n">timeoutInterval</span><span class="p">:</span> <span class="mf">10.0</span><span class="p">)</span>
+        <span class="n">mutableRequest</span><span class="p">.</span><span class="n">allHTTPHeaderFields</span> <span class="p">=</span> <span class="n">headers</span>
+        <span class="n">mutableRequest</span><span class="p">.</span><span class="n">HTTPMethod</span> <span class="p">=</span> <span class="n">method</span><span class="p">.</span><span class="n">rawValue</span>
+        <span class="k">if</span> <span class="kd">let</span> <span class="nv">params</span> <span class="p">=</span> <span class="n">params</span> <span class="p">{</span>
+            <span class="n">mutableRequest</span><span class="p">.</span><span class="n">HTTPBody</span> <span class="p">=</span> <span class="k">try</span><span class="o">!</span> <span class="n">NSJSONSerialization</span><span class="p">.</span><span class="n">dataWithJSONObject</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="p">[])</span>
+        <span class="p">}</span>
+
+        <span class="kd">let</span> <span class="nv">session</span> <span class="p">=</span> <span class="n">NSURLSession</span><span class="p">.</span><span class="n">sharedSession</span><span class="p">()</span>
+        <span class="n">task</span> <span class="p">=</span> <span class="n">session</span><span class="p">.</span><span class="n">dataTaskWithRequest</span><span class="p">(</span><span class="n">mutableRequest</span><span class="p">,</span> <span class="n">completionHandler</span><span class="p">:</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">response</span><span class="p">,</span> <span class="n">error</span> <span class="k">in</span>
+            <span class="c1">// Decide whether the response is success or failure and call</span>
+            <span class="c1">// proper callback.</span>
+        <span class="p">})</span>
+
+        <span class="n">task</span><span class="p">?.</span><span class="n">resume</span><span class="p">()</span>
+    <span class="p">}</span>
+
+    <span class="kd">func</span> <span class="nf">cancel</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">task</span><span class="p">?.</span><span class="n">cancel</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">class</span> <span class="nc">BackendService</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">conf</span><span class="p">:</span> <span class="n">BackendConfiguration</span>
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">service</span><span class="p">:</span> <span class="n">NetworkService</span><span class="o">!</span>
+
+    <span class="kd">init</span><span class="p">(</span><span class="kc">_</span> <span class="n">conf</span><span class="p">:</span> <span class="n">BackendConfiguration</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">conf</span> <span class="p">=</span> <span class="n">conf</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">service</span> <span class="p">=</span> <span class="n">NetworkService</span><span class="p">()</span>
+    <span class="p">}</span>
+
+    <span class="kd">func</span> <span class="nf">request</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">BackendAPIRequest</span><span class="p">,</span>
+                 <span class="n">success</span><span class="p">:</span> <span class="p">(</span><span class="nb">AnyObject</span><span class="p">?</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">,</span>
+                 <span class="n">failure</span><span class="p">:</span> <span class="p">(</span><span class="n">NSError</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span> <span class="p">=</span> <span class="kc">nil</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="kd">let</span> <span class="nv">url</span> <span class="p">=</span> <span class="n">conf</span><span class="p">.</span><span class="n">baseURL</span><span class="p">.</span><span class="n">URLByAppendingPathComponent</span><span class="p">(</span><span class="n">request</span><span class="p">.</span><span class="n">endpoint</span><span class="p">)</span>
+
+        <span class="kd">var</span> <span class="nv">headers</span> <span class="p">=</span> <span class="n">request</span><span class="p">.</span><span class="n">headers</span>
+        <span class="c1">// Set authentication token if available.</span>
+        <span class="n">headers</span><span class="p">?[</span><span class="s">&#34;X-Api-Auth-Token&#34;</span><span class="p">]</span> <span class="p">=</span> <span class="n">BackendAuth</span><span class="p">.</span><span class="n">shared</span><span class="p">.</span><span class="n">token</span>
+
+        <span class="n">service</span><span class="p">.</span><span class="n">request</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="n">url</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="n">request</span><span class="p">.</span><span class="n">method</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">request</span><span class="p">.</span><span class="n">parameters</span><span class="p">,</span> <span class="n">headers</span><span class="p">:</span> <span class="n">headers</span><span class="p">,</span> <span class="n">success</span><span class="p">:</span> <span class="p">{</span> <span class="n">data</span> <span class="k">in</span>
+            <span class="kd">var</span> <span class="nv">json</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?</span> <span class="p">=</span> <span class="kc">nil</span>
+            <span class="k">if</span> <span class="kd">let</span> <span class="nv">data</span> <span class="p">=</span> <span class="n">data</span> <span class="p">{</span>
+                <span class="n">json</span> <span class="p">=</span> <span class="k">try</span><span class="p">?</span> <span class="n">NSJSONSerialization</span><span class="p">.</span><span class="n">JSONObjectWithData</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="p">[])</span>
+            <span class="p">}</span>
+            <span class="n">success</span><span class="p">?(</span><span class="n">json</span><span class="p">)</span>
+
+            <span class="p">},</span> <span class="n">failure</span><span class="p">:</span> <span class="p">{</span> <span class="n">data</span><span class="p">,</span> <span class="n">error</span><span class="p">,</span> <span class="n">statusCode</span> <span class="k">in</span>
+                <span class="c1">// Do stuff you need, and call failure block.</span>
+        <span class="p">})</span>
+    <span class="p">}</span>
+
+    <span class="kd">func</span> <span class="nf">cancel</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">service</span><span class="p">.</span><span class="n">cancel</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>As you can see the <code>BackendService</code> can set authentication token in headers.
+The <code>BackendAuth</code> objects is a simple storage that stores the token in <code>NSUserDefaults</code>.
+If that would be necessary it could be storing the token in Keychain.</p>
+
+<p>The <code>BackendService</code> takes <code>BackendAPIRequest</code> as a parameter of <code>request(_:success:failure:)</code>
+method and extracts necessary informations from the <code>request</code> object. This is nicely encapsulated
+and backend service just consumes what it gets.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kr">final</span> <span class="kd">class</span> <span class="nc">BackendAuth</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">key</span> <span class="p">=</span> <span class="s">&#34;BackendAuthToken&#34;</span>
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">defaults</span><span class="p">:</span> <span class="n">NSUserDefaults</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kd">var</span> <span class="nv">shared</span><span class="p">:</span> <span class="n">BackendAuth</span><span class="o">!</span>
+
+    <span class="kd">public</span> <span class="kd">init</span><span class="p">(</span><span class="n">defaults</span><span class="p">:</span> <span class="n">NSUserDefaults</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">defaults</span> <span class="p">=</span> <span class="n">defaults</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kd">func</span> <span class="nf">setToken</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">String</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">defaults</span><span class="p">.</span><span class="n">setValue</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">forKey</span><span class="p">:</span> <span class="n">key</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kd">var</span> <span class="nv">token</span><span class="p">:</span> <span class="nb">String</span><span class="p">?</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">defaults</span><span class="p">.</span><span class="n">valueForKey</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">as</span><span class="p">?</span> <span class="nb">String</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kd">func</span> <span class="nf">deleteToken</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">defaults</span><span class="p">.</span><span class="n">removeObjectForKey</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>Both <code>NetworkService</code>, <code>BackendService</code> and <code>BackendAuth</code> are easy to test
+and maintain.</p>
+
+<h2 id="queueing-requests">Queueing requests</h2>
+
+<p>Several questions to cover here. <em>What way would we like to perform network requests?
+What if we want to perform many requests at a time? How would we like to be notified
+about the success or failure for requests in general?</em></p>
+
+<p>Decided to go with <code>NSOperationQueue</code> and <code>NSOperation</code>s that execute network
+requests.</p>
+
+<p>So, I subclassed <code>NSOperation</code> and overrided its <code>asynchronous</code> property to return
+<code>true</code>.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">class</span> <span class="nc">NetworkOperation</span><span class="p">:</span> <span class="n">NSOperation</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">_ready</span><span class="p">:</span> <span class="nb">Bool</span>
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">var</span> <span class="nv">ready</span><span class="p">:</span> <span class="nb">Bool</span> <span class="p">{</span>
+        <span class="kr">get</span> <span class="p">{</span> <span class="k">return</span> <span class="n">_ready</span> <span class="p">}</span>
+        <span class="kr">set</span> <span class="p">{</span> <span class="n">update</span><span class="p">({</span> <span class="kc">self</span><span class="p">.</span><span class="n">_ready</span> <span class="p">=</span> <span class="n">newValue</span> <span class="p">},</span> <span class="n">key</span><span class="p">:</span> <span class="s">&#34;isReady&#34;</span><span class="p">)</span> <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">_executing</span><span class="p">:</span> <span class="nb">Bool</span>
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">var</span> <span class="nv">executing</span><span class="p">:</span> <span class="nb">Bool</span> <span class="p">{</span>
+        <span class="kr">get</span> <span class="p">{</span> <span class="k">return</span> <span class="n">_executing</span> <span class="p">}</span>
+        <span class="kr">set</span> <span class="p">{</span> <span class="n">update</span><span class="p">({</span> <span class="kc">self</span><span class="p">.</span><span class="n">_executing</span> <span class="p">=</span> <span class="n">newValue</span> <span class="p">},</span> <span class="n">key</span><span class="p">:</span> <span class="s">&#34;isExecuting&#34;</span><span class="p">)</span> <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">_finished</span><span class="p">:</span> <span class="nb">Bool</span>
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">var</span> <span class="nv">finished</span><span class="p">:</span> <span class="nb">Bool</span> <span class="p">{</span>
+        <span class="kr">get</span> <span class="p">{</span> <span class="k">return</span> <span class="n">_finished</span> <span class="p">}</span>
+        <span class="kr">set</span> <span class="p">{</span> <span class="n">update</span><span class="p">({</span> <span class="kc">self</span><span class="p">.</span><span class="n">_finished</span> <span class="p">=</span> <span class="n">newValue</span> <span class="p">},</span> <span class="n">key</span><span class="p">:</span> <span class="s">&#34;isFinished&#34;</span><span class="p">)</span> <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">var</span> <span class="nv">_cancelled</span><span class="p">:</span> <span class="nb">Bool</span>
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">var</span> <span class="nv">cancelled</span><span class="p">:</span> <span class="nb">Bool</span> <span class="p">{</span>
+        <span class="kr">get</span> <span class="p">{</span> <span class="k">return</span> <span class="n">_cancelled</span> <span class="p">}</span>
+        <span class="kr">set</span> <span class="p">{</span> <span class="n">update</span><span class="p">({</span> <span class="kc">self</span><span class="p">.</span><span class="n">_cancelled</span> <span class="p">=</span> <span class="n">newValue</span> <span class="p">},</span> <span class="n">key</span><span class="p">:</span> <span class="s">&#34;isCancelled&#34;</span><span class="p">)</span> <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">func</span> <span class="nf">update</span><span class="p">(</span><span class="n">change</span><span class="p">:</span> <span class="nb">Void</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">String</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">willChangeValueForKey</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">change</span><span class="p">()</span>
+        <span class="n">didChangeValueForKey</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="kr">override</span> <span class="kd">init</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">_ready</span> <span class="p">=</span> <span class="kc">true</span>
+        <span class="n">_executing</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="n">_finished</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="n">_cancelled</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="kc">super</span><span class="p">.</span><span class="kd">init</span><span class="p">()</span>
+        <span class="n">name</span> <span class="p">=</span> <span class="s">&#34;Network Operation&#34;</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">var</span> <span class="nv">asynchronous</span><span class="p">:</span> <span class="nb">Bool</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kc">true</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">func</span> <span class="nf">start</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="kc">self</span><span class="p">.</span><span class="n">executing</span> <span class="p">==</span> <span class="kc">false</span> <span class="p">{</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">ready</span> <span class="p">=</span> <span class="kc">false</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">executing</span> <span class="p">=</span> <span class="kc">true</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">finished</span> <span class="p">=</span> <span class="kc">false</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">cancelled</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="c1">/// Used only by subclasses. Externally you should use `cancel`.</span>
+    <span class="kd">func</span> <span class="nf">finish</span><span class="p">()</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">executing</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">finished</span> <span class="p">=</span> <span class="kc">true</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">func</span> <span class="nf">cancel</span><span class="p">()</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">executing</span> <span class="p">=</span> <span class="kc">false</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">cancelled</span> <span class="p">=</span> <span class="kc">true</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>Next, because I want to use the <code>BackendService</code> for executing network calls
+I subclassed <code>NetworkOperation</code> and created <code>ServiceOperation</code>.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">class</span> <span class="nc">ServiceOperation</span><span class="p">:</span> <span class="n">NetworkOperation</span> <span class="p">{</span>
+
+    <span class="kd">let</span> <span class="nv">service</span><span class="p">:</span> <span class="n">BackendService</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">init</span><span class="p">()</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">service</span> <span class="p">=</span> <span class="n">BackendService</span><span class="p">(</span><span class="n">BackendConfiguration</span><span class="p">.</span><span class="n">shared</span><span class="p">)</span>
+        <span class="kc">super</span><span class="p">.</span><span class="kd">init</span><span class="p">()</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">func</span> <span class="nf">cancel</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">service</span><span class="p">.</span><span class="n">cancel</span><span class="p">()</span>
+        <span class="kc">super</span><span class="p">.</span><span class="n">cancel</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>The class creates <code>BackendService</code> internally so I don&rsquo;t need to create it
+in its every subclass.</p>
+
+<p>Here is how the <em>Sign In</em> operation might look like:</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">class</span> <span class="nc">SignInOperation</span><span class="p">:</span> <span class="n">ServiceOperation</span> <span class="p">{</span>
+
+    <span class="kd">private</span> <span class="kd">let</span> <span class="nv">request</span><span class="p">:</span> <span class="n">SignInRequest</span>
+
+    <span class="kd">public</span> <span class="kd">var</span> <span class="nv">success</span><span class="p">:</span> <span class="p">(</span><span class="n">SignInItem</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span>
+    <span class="kd">public</span> <span class="kd">var</span> <span class="nv">failure</span><span class="p">:</span> <span class="p">(</span><span class="n">NSError</span> <span class="p">-&gt;</span> <span class="nb">Void</span><span class="p">)?</span>
+
+    <span class="kd">public</span> <span class="kd">init</span><span class="p">(</span><span class="n">email</span><span class="p">:</span> <span class="nb">String</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">String</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">request</span> <span class="p">=</span> <span class="n">SignInRequest</span><span class="p">(</span><span class="n">email</span><span class="p">:</span> <span class="n">email</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="n">password</span><span class="p">)</span>
+        <span class="kc">super</span><span class="p">.</span><span class="kd">init</span><span class="p">()</span>
+    <span class="p">}</span>
+
+    <span class="kd">public</span> <span class="kr">override</span> <span class="kd">func</span> <span class="nf">start</span><span class="p">()</span> <span class="p">{</span>
+        <span class="kc">super</span><span class="p">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="n">service</span><span class="p">.</span><span class="n">request</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">success</span><span class="p">:</span> <span class="n">handleSuccess</span><span class="p">,</span> <span class="n">failure</span><span class="p">:</span> <span class="n">handleFailure</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">func</span> <span class="nf">handleSuccess</span><span class="p">(</span><span class="n">response</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?)</span> <span class="p">{</span>
+        <span class="k">do</span> <span class="p">{</span>
+            <span class="kd">let</span> <span class="nv">item</span> <span class="p">=</span> <span class="k">try</span> <span class="n">SignInResponseMapper</span><span class="p">.</span><span class="n">process</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">success</span><span class="p">?(</span><span class="n">item</span><span class="p">)</span>
+            <span class="kc">self</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span>
+        <span class="p">}</span> <span class="k">catch</span> <span class="p">{</span>
+            <span class="n">handleFailure</span><span class="p">(</span><span class="n">NSError</span><span class="p">.</span><span class="n">cannotParseResponse</span><span class="p">())</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="kd">private</span> <span class="kd">func</span> <span class="nf">handleFailure</span><span class="p">(</span><span class="n">error</span><span class="p">:</span> <span class="n">NSError</span><span class="p">)</span> <span class="p">{</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">failure</span><span class="p">?(</span><span class="n">error</span><span class="p">)</span>
+        <span class="kc">self</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>In the <code>start</code> method the service executes request that is created internally in
+the operation&rsquo;s constructor. <code>handleSuccess</code> and <code>handleFailure</code> methods
+are passed as a callbacks for <code>request(_:success:failure:)</code> method of a service.
+IMO this makes the code more clean, and it is still readable.</p>
+
+<p>Operations are passed to a <code>NetworkQueue</code> object that is a singleton and can
+queue every operation. For now I keep it as simple as possible:</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">class</span> <span class="nc">NetworkQueue</span> <span class="p">{</span>
+
+    <span class="kd">public</span> <span class="kd">static</span> <span class="kd">var</span> <span class="nv">shared</span><span class="p">:</span> <span class="n">NetworkQueue</span><span class="o">!</span>
+
+    <span class="kd">let</span> <span class="nv">queue</span> <span class="p">=</span> <span class="n">NSOperationQueue</span><span class="p">()</span>
+
+    <span class="kd">public</span> <span class="kd">init</span><span class="p">()</span> <span class="p">{}</span>
+
+    <span class="kd">public</span> <span class="kd">func</span> <span class="nf">addOperation</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">NSOperation</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">queue</span><span class="p">.</span><span class="n">addOperation</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>What are advantages of executing operations in one place?</p>
+
+<ul>
+<li>Easily cancellation of all network operations.</li>
+<li>Cancellation all operations that are downloading images or other operations that
+are requesting data that is not needed to provide user a basic experience of using the app while
+network connection is weak. E.g. you would like to prevent downloading images when
+user is on weak connection.</li>
+<li>You can build a priority queue and execute some requests first to get answer faster.</li>
+</ul>
+
+<h2 id="working-with-core-data">Working with Core Data</h2>
+
+<p>This is the aspect for which I had to delay the publication of this entry.
+In previous version of the network layer operations returned Core Data objects.
+The response was received, parsed and converted to Core Data object.
+This solution was far from ideal.</p>
+
+<ul>
+<li>The operation have to know what Core Data is. Because I had model detached to
+separate framework and network layer was in separate framework too, the
+network framework have to know about model framework.</li>
+<li>Each operation have to take additional <code>NSManagedObjectContext</code> parameter to know
+which context it should operate on.</li>
+<li>Each time the response was received and was about to call success block it first
+tried to find object in a context, or hit the disk to fetch object from disk.
+IMO this is a big disadvantage. You not always want to create Core Data object.</li>
+</ul>
+
+<p>So I came with idea to take out Core Data out of network layer completely.
+I created middle layer that are objects created in result of parsing responses.</p>
+
+<ul>
+<li>This way the parsing and creating objects is quick and not require to hit a disk.</li>
+<li>You also don&rsquo;t need to pass <code>NSManagedObjectContext</code> to operation.</li>
+<li>You can update your core data object in the <code>success</code> block using the parsed item
+and reference to Core Data object that you probably keep somewhere where you create the
+operation - this is my case in most situations when the operation is added to a queue.</li>
+</ul>
+
+<h2 id="mapping-responses">Mapping responses</h2>
+
+<p>The idea of response mappers was to separate the logic of parsing and mapping JSON
+to useful items.</p>
+
+<p>We can distinguish two type of parsers. The first type return just a single object of
+specific type. The second type is a parser that parses array of such items.</p>
+
+<p>First, let&rsquo;s define a common protocol for all the items:</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">protocol</span> <span class="nc">ParsedItem</span> <span class="p">{}</span></code></pre></div>
+
+<p>Now, here are some objects that are products of mappers:</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">public</span> <span class="kd">struct</span> <span class="nc">SignInItem</span><span class="p">:</span> <span class="n">ParsedItem</span> <span class="p">{</span>
+
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">token</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">uniqueId</span><span class="p">:</span> <span class="nb">String</span>
+<span class="p">}</span>
+
+<span class="kd">public</span> <span class="kd">struct</span> <span class="nc">UserItem</span><span class="p">:</span> <span class="n">ParsedItem</span> <span class="p">{</span>
+
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">uniqueId</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">firstName</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">lastName</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">email</span><span class="p">:</span> <span class="nb">String</span>
+    <span class="kd">public</span> <span class="kd">let</span> <span class="nv">phoneNumber</span><span class="p">:</span> <span class="nb">String</span><span class="p">?</span>
+<span class="p">}</span></code></pre></div>
+
+<p>Let&rsquo;s define an error type that will be thrown when something went wrong
+with parsing.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">internal</span> <span class="kd">enum</span> <span class="nc">ResponseMapperError</span><span class="p">:</span> <span class="n">ErrorType</span> <span class="p">{</span>
+    <span class="k">case</span> <span class="n">Invalid</span>
+    <span class="k">case</span> <span class="n">MissingAttribute</span>
+<span class="p">}</span></code></pre></div>
+
+<ul>
+<li><code>Invalid</code> - thrown when passed json is nil and should not be nil, or
+when it is array of objects instead of expected json with a single object.</li>
+<li><code>MissingAttribute</code> - self explanatory, when key is missing in json or when
+after parsing the value is nil and should not be.</li>
+</ul>
+
+<p>A <code>ResponseMapper</code> may look like this</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">class</span> <span class="nc">ResponseMapper</span><span class="p">&lt;</span><span class="n">A</span><span class="p">:</span> <span class="n">ParsedItem</span><span class="o">&gt;</span> <span class="p">{</span>
+
+    <span class="kd">static</span> <span class="kd">func</span> <span class="nf">process</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?,</span> <span class="n">parse</span><span class="p">:</span> <span class="p">(</span><span class="n">json</span><span class="p">:</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">])</span> <span class="p">-&gt;</span> <span class="n">A</span><span class="p">?)</span> <span class="kr">throws</span> <span class="p">-&gt;</span> <span class="n">A</span> <span class="p">{</span>
+        <span class="k">guard</span> <span class="kd">let</span> <span class="nv">json</span> <span class="p">=</span> <span class="n">obj</span> <span class="k">as</span><span class="p">?</span> <span class="p">[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">]</span> <span class="k">else</span> <span class="p">{</span> <span class="k">throw</span> <span class="n">ResponseMapperError</span><span class="p">.</span><span class="n">Invalid</span> <span class="p">}</span>
+        <span class="k">if</span> <span class="kd">let</span> <span class="nv">item</span> <span class="p">=</span> <span class="n">parse</span><span class="p">(</span><span class="n">json</span><span class="p">:</span> <span class="n">json</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="n">item</span>
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="n">L</span><span class="p">.</span><span class="n">log</span><span class="p">(</span><span class="s">&#34;Mapper failure (</span><span class="si">\(</span><span class="kc">self</span><span class="si">)</span><span class="s">). Missing attribute.&#34;</span><span class="p">)</span>
+            <span class="k">throw</span> <span class="n">ResponseMapperError</span><span class="p">.</span><span class="n">MissingAttribute</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>It takes an <code>obj</code> which is response from the backend - a JSON in our case,
+and a <code>parse</code> method which consumes this <code>obj</code> and returns <code>A</code> object that
+conforms to <code>ParsedItem</code>.</p>
+
+<p>Now that we have this generic mapper we can create concrete mappers.
+Let&rsquo;s take a look on a mapper used for parsing response of <em>Sign In</em> operation.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kd">protocol</span> <span class="nc">ResponseMapperProtocol</span> <span class="p">{</span>
+    <span class="n">associatedtype</span> <span class="n">Item</span>
+    <span class="kd">static</span> <span class="kd">func</span> <span class="nf">process</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?)</span> <span class="kr">throws</span> <span class="p">-&gt;</span> <span class="n">Item</span>
+<span class="p">}</span>
+
+<span class="kr">final</span> <span class="kd">class</span> <span class="nc">SignInResponseMapper</span><span class="p">:</span> <span class="n">ResponseMapper</span><span class="p">&lt;</span><span class="n">SignInItem</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">ResponseMapperProtocol</span> <span class="p">{</span>
+
+    <span class="kd">static</span> <span class="kd">func</span> <span class="nf">process</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?)</span> <span class="kr">throws</span> <span class="p">-&gt;</span> <span class="n">SignInItem</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="k">try</span> <span class="n">process</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">parse</span><span class="p">:</span> <span class="p">{</span> <span class="n">json</span> <span class="k">in</span>
+            <span class="kd">let</span> <span class="nv">token</span> <span class="p">=</span> <span class="n">json</span><span class="p">[</span><span class="s">&#34;token&#34;</span><span class="p">]</span> <span class="k">as</span><span class="p">?</span> <span class="nb">String</span>
+            <span class="kd">let</span> <span class="nv">uniqueId</span> <span class="p">=</span> <span class="n">json</span><span class="p">[</span><span class="s">&#34;unique_id&#34;</span><span class="p">]</span> <span class="k">as</span><span class="p">?</span> <span class="nb">String</span>
+            <span class="k">if</span> <span class="kd">let</span> <span class="nv">token</span> <span class="p">=</span> <span class="n">token</span><span class="p">,</span> <span class="kd">let</span> <span class="nv">uniqueId</span> <span class="p">=</span> <span class="n">uniqueId</span> <span class="p">{</span>
+                <span class="k">return</span> <span class="n">SignInItem</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="n">token</span><span class="p">,</span> <span class="n">uniqueId</span><span class="p">:</span> <span class="n">uniqueId</span><span class="p">)</span>
+            <span class="p">}</span>
+            <span class="k">return</span> <span class="kc">nil</span>
+        <span class="p">})</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>The <code>ResponseMapperProtocol</code> is a protocol to be implemented by concrete mappers
+so they share the same method for parsing response.</p>
+
+<p>Then, such a mapper is used in a success block of an operation and you can operate
+on concrete object of specific type instead of dictionary. Easy to use such object
+later, evertything is easy to test.</p>
+
+<p>The last thing is a response mapper for parsing arrays.</p>
+
+<div class="highlight"><pre class="chroma"><code class="language-swift" data-lang="swift"><span class="kr">final</span> <span class="kd">class</span> <span class="nc">ArrayResponseMapper</span><span class="p">&lt;</span><span class="n">A</span><span class="p">:</span> <span class="n">ParsedItem</span><span class="o">&gt;</span> <span class="p">{</span>
+
+    <span class="kd">static</span> <span class="kd">func</span> <span class="nf">process</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">?,</span> <span class="n">mapper</span><span class="p">:</span> <span class="p">(</span><span class="nb">AnyObject</span><span class="p">?</span> <span class="kr">throws</span> <span class="p">-&gt;</span> <span class="n">A</span><span class="p">))</span> <span class="kr">throws</span> <span class="p">-&gt;</span> <span class="p">[</span><span class="n">A</span><span class="p">]</span> <span class="p">{</span>
+        <span class="k">guard</span> <span class="kd">let</span> <span class="nv">json</span> <span class="p">=</span> <span class="n">obj</span> <span class="k">as</span><span class="p">?</span> <span class="p">[[</span><span class="nb">String</span><span class="p">:</span> <span class="nb">AnyObject</span><span class="p">]]</span> <span class="k">else</span> <span class="p">{</span> <span class="k">throw</span> <span class="n">ResponseMapperError</span><span class="p">.</span><span class="n">Invalid</span> <span class="p">}</span>
+
+        <span class="kd">var</span> <span class="nv">items</span> <span class="p">=</span> <span class="p">[</span><span class="n">A</span><span class="p">]()</span>
+        <span class="k">for</span> <span class="n">jsonNode</span> <span class="k">in</span> <span class="n">json</span> <span class="p">{</span>
+            <span class="kd">let</span> <span class="nv">item</span> <span class="p">=</span> <span class="k">try</span> <span class="n">mapper</span><span class="p">(</span><span class="n">jsonNode</span><span class="p">)</span>
+            <span class="n">items</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">items</span>
+    <span class="p">}</span>
+<span class="p">}</span></code></pre></div>
+
+<p>It takes a mapping function and return array of items if everything is correctly parsed.
+Depends on what you expect you might throw an error if just a single item can&rsquo;t be parsed
+or return empty array in worst case as a product of this mapper.
+The mapper expects that the <code>obj</code> (response from the backend) is an array of
+JSON elements.</p>
+
+<p>Here is diagram that presents the network layer architecture.</p>
+
+<p><a href="/uploads/programming-blog/post-53/diagram.png"><img src="/uploads/programming-blog/post-53/diagram.png" alt="diagram" /></a></p>
+
+<h2 id="example-project">Example project</h2>
+
+<p>You can find an example project here <a href="https://github.com/tomkowz/NetworkLayerExample">on my github</a>.
+The project is using fake url for the backend, so no request will finish with success.
+I made this available only to give you a view of how the foundation of the network layer
+look like.</p>
+
+<h2 id="wrap-up">Wrap up</h2>
+
+<p>I found this way of doing network layer very useful, simple and easy to work with.</p>
+
+<ul>
+<li>The biggest advantage of it is that you can easily add new operations that
+will have similar design to others and that it does not know anything about Core Data.</li>
+<li>You can keep the code coverage close to 100% with no big effort, without thinking how to
+cover a super hard cases, because there is no such cases at all.</li>
+<li>The core of it is easy to reuse in other applications that have similar complexity.</li>
+</ul>
+</p>
+        <footer>--<br/>2015-2018 All rights reserved. Tomasz Szulc</footer>
+    </article>
+        <footer></footer>
+    </main>
+</body>
+</html>
